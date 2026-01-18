@@ -1,17 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb; // TAMBAHKAN
+import 'package:wisata_candi/helpers/database_helper.dart'; // TAMBAHKAN
+import 'package:wisata_candi/data/candi_data.dart'; // TAMBAHKAN
 import 'package:wisata_candi/screens/favorite_screen.dart';
 import 'package:wisata_candi/screens/home_screen.dart';
 import 'package:wisata_candi/screens/profile_screen.dart';
 import 'package:wisata_candi/screens/search_screen.dart';
 import 'package:wisata_candi/screens/signup_screen.dart';
+import 'package:wisata_candi/screens/signin_screen.dart';
 // import 'package:wisata_candi/screens/detail_screen.dart';
 // import 'package:wisata_candi/screens/profile_screen.dart';
 // import 'package:wisata_candi/screens/search_screen.dart';
 // import 'package:wisata_candi/screens/signin_screen.dart';
 // import 'data/candi_data.dart';
 
-void main() {
+void main() async {
+  // ✅ TAMBAHKAN async
+  WidgetsFlutterBinding.ensureInitialized(); // ✅ TAMBAHKAN INI
+
+  // ✅ TAMBAHKAN - Inisialisasi database untuk non-web platform
+  if (!kIsWeb) {
+    try {
+      await _initializeDatabase();
+    } catch (e) {
+      print('❌ Error initializing database: $e');
+    }
+  }
+
   runApp(const MainApp());
+}
+
+Future<void> _initializeDatabase() async {
+  try {
+    final dbHelper = DatabaseHelper();
+
+    print('Checking database status...');
+
+    // Check apakah database sudah memiliki data
+    final isEmpty = await dbHelper.isDatabaseEmpty();
+
+    if (isEmpty) {
+      print('Database empty, migrating data...');
+
+      // Migrasi data dari static list ke database
+      await dbHelper.insertCandiList(candiList);
+
+      print('Data candi berhasil dimigrasikan ke database');
+    } else {
+      print('Database sudah memiliki data');
+    }
+  } catch (e) {
+    print('Database initialization error: $e');
+    rethrow;
+  }
 }
 
 /// The main application widget.
@@ -38,13 +79,14 @@ class MainApp extends StatelessWidget {
           seedColor: Colors.deepPurple,
         ).copyWith(primary: Colors.deepPurple, surface: Colors.deepPurple[50]),
       ),
-      // home: DetailScreen(
-      //   candi: candiList[2],
-      // ), // Example usage with the first Candi
-      // home: ProfileScreen(),
-      // home: SearchScreen(),
-      // home: MainScreen(),
-      home: SignUpScreen(),
+      // Definisi named routes untuk navigasi
+      routes: {
+        '/': (context) => MainScreen(),
+        '/signup': (context) => SignUpScreen(),
+        '/signin': (context) => SigninScreen(),
+      },
+      // Initial route - halaman pertama yang dibuka
+      initialRoute: '/',
     );
   }
 }

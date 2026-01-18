@@ -1,7 +1,13 @@
 // Import library material untuk menggunakan widget Material Design
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 // Import widget custom ProfileInfoItem dari folder widgets
 import 'package:wisata_candi/widgets/profile_info_item.dart';
+// Import image_picker untuk mengambil gambar dari kamera/galeri
+import 'package:image_picker/image_picker.dart';
+// Import shared_preferences untuk menyimpan path gambar profil
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Kelas ProfileScreen yang merupakan StatefulWidget karena memiliki state yang berubah
 class ProfileScreen extends StatefulWidget {
@@ -25,6 +31,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Variabel untuk menyimpan jumlah candi favorit (default: 0)
   int favoriteCandiCount = 0;
 
+  // Variabel untuk menyimpan path gambar profil
+  String _imageFile = '';
+  // Instance ImagePicker untuk mengambil gambar
+  final picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    // Load data profil dari SharedPreferences saat widget diinisialisasi
+    _loadProfileData();
+  }
+
+  // Fungsi untuk load data profil dari SharedPreferences
+  Future<void> _loadProfileData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      // Ambil path gambar dari SharedPreferences dengan key 'profile_image_path'
+      _imageFile = prefs.getString('profile_image_path') ?? '';
+      // Ambil status isSignedIn dari SharedPreferences
+      isSignedIn = prefs.getBool('isSignedIn') ?? false;
+      // Ambil fullName dari SharedPreferences
+      fullName = prefs.getString('fullName') ?? '';
+      // Ambil userName dari SharedPreferences
+      userName = prefs.getString('username') ?? '';
+    });
+  }
+
+  // Fungsi untuk menyimpan path gambar profil ke SharedPreferences
+  Future<void> _saveProfileImage(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('profile_image_path', path);
+  }
+
+  // Fungsi untuk mengambil gambar dari kamera atau galeri
+  Future<void> _getImage(ImageSource source) async {
+    // Mengambil gambar dari sumber yang ditentukan (kamera/galeri)
+    final pickedFile = await picker.pickImage(source: source);
+    // Jika user memilih gambar (tidak cancel)
+    if (pickedFile != null) {
+      setState(() {
+        // Simpan path gambar ke variabel _imageFile
+        _imageFile = pickedFile.path;
+      });
+      // Simpan path gambar ke SharedPreferences
+      await _saveProfileImage(pickedFile.path);
+    }
+  }
+
+  // Fungsi untuk menampilkan modal bottom sheet pilihan sumber gambar
+  void _showPicker() {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Column(
+          // Set MainAxisSize.min agar tinggi bottom sheet minimal
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ListTile pertama untuk judul
+            ListTile(
+              title: Text(
+                'Image Source',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            // ListTile kedua untuk opsi Gallery
+            ListTile(
+              leading: Icon(Icons.photo_library),
+              title: Text('Gallery'),
+              onTap: () {
+                // Tutup bottom sheet
+                Navigator.of(context).pop();
+                // Ambil gambar dari galeri
+                _getImage(ImageSource.gallery);
+              },
+            ),
+            // ListTile ketiga untuk opsi Camera
+            ListTile(
+              leading: Icon(Icons.photo_camera),
+              title: Text('Camera'),
+              onTap: () {
+                // Tutup bottom sheet
+                Navigator.of(context).pop();
+                // Ambil gambar dari kamera
+                _getImage(ImageSource.camera);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // TODO: 5. Implementasi fungsi Sign In
   // Fungsi untuk menangani proses sign in
   void signIn() {
@@ -37,11 +135,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // TODO: 6. Implementasi fungsi Sign Out
   // Fungsi untuk menangani proses sign out
-  void signOut() {
+  void signOut() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Hapus status isSignedIn dari SharedPreferences
+    await prefs.setBool('isSignedIn', false);
     // setState untuk memperbarui UI
     setState(() {
-      // Toggle nilai isSignedIn (mengubah true menjadi false atau sebaliknya)
-      isSignedIn = !isSignedIn;
+      // Set isSignedIn menjadi false
+      isSignedIn = false;
     });
   }
 
@@ -98,18 +199,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: CircleAvatar(
                             // Radius (jari-jari) avatar 50 pixel
                             radius: 50,
-                            // Gambar profil dari asset
-                            backgroundImage: AssetImage(
-                              'images/placeholder_image.png',
-                            ),
+                            // Jika ada gambar profil yang dipilih, tampilkan dari file
+                            // Jika tidak, tampilkan gambar placeholder dari asset
+                            backgroundImage: _imageFile.isNotEmpty
+                                ? FileImage(File(_imageFile))
+                                : AssetImage('images/placeholder_image.png')
+                                      as ImageProvider,
                           ),
                         ),
                         // Kondisi: tampilkan icon kamera hanya jika user sudah sign in
                         if (isSignedIn)
                           // IconButton untuk mengubah foto profil
                           IconButton(
-                            // Fungsi ketika tombol ditekan (masih kosong)
-                            onPressed: () {},
+                            // Fungsi ketika tombol ditekan - menampilkan picker
+                            onPressed: _showPicker,
                             // Icon kamera
                             icon: Icon(
                               Icons.camera_alt,
@@ -191,8 +294,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 isSignedIn
                     // Jika user sudah sign in, tampilkan tombol Sign Out
                     ? TextButton(onPressed: signOut, child: Text('Sign Out'))
-                    // Jika user belum sign in, tampilkan tombol Sign In
-                    : TextButton(onPressed: signIn, child: Text('Sign In')),
+                    // Jika user belum sign in, tampilkan tombol Sign Up untuk navigasi ke halaman registrasi
+                    : TextButton(
+                        onPressed: () {
+                          // Navigasi ke halaman Sign Up
+                          Navigator.pushNamed(context, '/signup');
+                        },
+                        child: Text('Sign Up'),
+                      ),
               ],
             ),
           ),
