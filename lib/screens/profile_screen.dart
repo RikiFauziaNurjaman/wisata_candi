@@ -2,12 +2,17 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 // Import widget custom ProfileInfoItem dari folder widgets
 import 'package:wisata_candi/widgets/profile_info_item.dart';
 // Import image_picker untuk mengambil gambar dari kamera/galeri
 import 'package:image_picker/image_picker.dart';
 // Import shared_preferences untuk menyimpan path gambar profil
 import 'package:shared_preferences/shared_preferences.dart';
+// Import database helper untuk mengambil jumlah favorit
+import 'package:wisata_candi/helpers/database_helper.dart';
+// Import data static untuk fallback web
+import 'package:wisata_candi/data/candi_data.dart';
 
 // Kelas ProfileScreen yang merupakan StatefulWidget karena memiliki state yang berubah
 class ProfileScreen extends StatefulWidget {
@@ -43,9 +48,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfileData();
   }
 
-  // Fungsi untuk load data profil dari SharedPreferences
+  // Fungsi untuk load data profil dari SharedPreferences dan database
   Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Load jumlah favorit dari database
+    int favoriteCount = 0;
+    try {
+      if (kIsWeb) {
+        // Untuk web, hitung dari data static
+        favoriteCount = candiList.where((candi) => candi.isFavorite).length;
+      } else {
+        // Untuk mobile/desktop, ambil dari database
+        final dbHelper = DatabaseHelper();
+        final favoriteList = await dbHelper.getFavoriteCandi();
+        favoriteCount = favoriteList.length;
+      }
+    } catch (e) {
+      print('Error loading favorite count: $e');
+    }
+
     setState(() {
       // Ambil path gambar dari SharedPreferences dengan key 'profile_image_path'
       _imageFile = prefs.getString('profile_image_path') ?? '';
@@ -55,6 +77,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       fullName = prefs.getString('fullName') ?? '';
       // Ambil userName dari SharedPreferences
       userName = prefs.getString('username') ?? '';
+      // Set jumlah favorit dari database
+      favoriteCandiCount = favoriteCount;
     });
   }
 
